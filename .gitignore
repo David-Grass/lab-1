@@ -6,3 +6,4 @@ dist/
 data/
 *.db
 *.db-journal
+lab1_frontend/dist/

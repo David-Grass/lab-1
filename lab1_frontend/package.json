@@ -1,0 +1,18 @@
+{
+  "name": "lab1_frontend",
+  "version": "0.4.0",
+  "private": true,
+  "description": "ЛР4 – фронтенд TypeScript + fetch для сервісу репортів (варіант 6)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "author": "David Hrass KB-14",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

@@ -1,4 +1,25 @@
-# ЛР3 – REST API + SQLite (варіант 6)
+# ЛР4 – REST API + SQLite + CORS (варіант 6)
+
+> **ЛР4:** фронтенд у `../lab1_frontend/` (TypeScript, fetch). API доступне на **`/api/v1/...`** і **`/api/...`**. CORS дозволяє `http://localhost:5173` та `:5500`.
+
+## 4.1. Запуск разом з фронтендом
+
+```powershell
+# API
+cd lab2-api
+npm install
+npm run seed
+npm run dev
+
+# Frontend (інший термінал)
+cd ../lab1_frontend
+npm install
+npm run dev
+```
+
+Фронт: http://localhost:5173 · API: http://localhost:3000/api/v1/reports
+
+---
 
 ## Структура проєкту
 

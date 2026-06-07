@@ -12,6 +12,7 @@
   --danger: #dc2626;
   --border: #d1d5db;
   --soft: #f8fafc;
+  --success: #166534;
 }
 
 body {
@@ -45,7 +46,8 @@ body {
 }
 
 h1,
-h2 {
+h2,
+h3 {
   margin: 0 0 10px;
 }
 
@@ -53,6 +55,36 @@ h2 {
 .muted {
   margin: 0;
   color: var(--muted);
+}
+
+.notice {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.notice--info {
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.notice--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.notice--success {
+  background: #dcfce7;
+  color: var(--success);
+}
+
+.list-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
 }
 
 .layout {
@@ -106,7 +138,6 @@ textarea {
   border-radius: 8px;
   font: inherit;
   background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 textarea {
@@ -140,7 +171,8 @@ textarea:focus {
 }
 
 .buttons,
-.toolbar {
+.toolbar,
+.pagination {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -154,26 +186,16 @@ button {
   cursor: pointer;
   font: inherit;
   font-weight: 700;
-  transition: transform 0.15s, background 0.2s, opacity 0.2s;
-}
-
-button:hover {
-  transform: translateY(-1px);
 }
 
 button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
-  transform: none;
 }
 
 #submitBtn {
   background: var(--primary);
   color: #fff;
-}
-
-#submitBtn:hover {
-  background: var(--primary-dark);
 }
 
 #resetBtn,
@@ -233,15 +255,6 @@ td {
 th {
   background: #eff6ff;
   color: #1e3a8a;
-  white-space: nowrap;
-}
-
-th[data-sort] {
-  cursor: pointer;
-}
-
-tr:hover {
-  background: #f8fafc;
 }
 
 .badge {
@@ -279,6 +292,11 @@ tr:hover {
   font-size: 14px;
 }
 
+.view-btn {
+  background: #6366f1;
+  color: #fff;
+}
+
 .edit-btn {
   background: #0ea5e9;
   color: #fff;
@@ -300,6 +318,19 @@ tr:hover {
 
 .description-cell {
   max-width: 260px;
+}
+
+.detail-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.pagination {
+  margin-top: 14px;
+  align-items: center;
 }
 
 @media (max-width: 900px) {

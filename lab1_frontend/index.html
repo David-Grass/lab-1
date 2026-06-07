@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ЛР4 – Варіант 6: Репорти вразливостей</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Лабораторна робота №4 • Варіант 6</p>
+          <h1>Сервіс «Репорт вразливості»</h1>
+          <p class="subtitle">
+            Інтеграція фронтенду з REST API (fetch, CORS, TypeScript, apiClient).
+          </p>
+        </div>
+      </header>
+
+      <div id="notice" class="notice hidden"></div>
+
+      <main class="layout">
+        <section class="card form-card">
+          <h2 id="formTitle">Новий репорт</h2>
+
+          <form id="reportForm" novalidate>
+            <div class="field">
+              <label for="titleInput">Назва вразливості</label>
+              <input
+                id="titleInput"
+                type="text"
+                placeholder="Напр., XSS у формі коментарів"
+                maxlength="80"
+                required
+              />
+              <p class="error-text" id="titleError"></p>
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <label for="severitySelect">Критичність</label>
+                <select id="severitySelect" required>
+                  <option value="">Оберіть критичність</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+                <p class="error-text" id="severityError"></p>
+              </div>
+
+              <div class="field">
+                <label for="statusSelect">Статус</label>
+                <select id="statusSelect" required>
+                  <option value="Open">Open</option>
+                  <option value="InProgress">InProgress</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Closed">Closed</option>
+                </select>
+                <p class="error-text" id="statusError"></p>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="descriptionInput">Опис</label>
+              <textarea
+                id="descriptionInput"
+                rows="5"
+                placeholder="Опишіть вразливість та кроки відтворення"
+                maxlength="500"
+                required
+              ></textarea>
+              <p class="error-text" id="descriptionError"></p>
+            </div>
+
+            <div class="field">
+              <label for="userSelect">Автор (користувач API)</label>
+              <select id="userSelect" required>
+                <option value="">Завантаження користувачів...</option>
+              </select>
+              <p class="error-text" id="userError"></p>
+            </div>
+
+            <p class="form-message" id="formMessage"></p>
+
+            <div class="buttons">
+              <button type="submit" id="submitBtn">Зберегти</button>
+              <button type="button" id="resetBtn">Очистити</button>
+              <button type="button" id="cancelEditBtn" class="hidden">
+                Скасувати редагування
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card list-card">
+          <div class="list-header">
+            <div>
+              <h2>Список репортів</h2>
+              <p class="muted" id="counterText">Записів: 0</p>
+            </div>
+            <button type="button" id="cancelLoadBtn" class="secondary-btn hidden">
+              Скасувати завантаження
+            </button>
+          </div>
+
+          <p id="listStatus" class="list-status hidden"></p>
+
+          <div class="toolbar">
+            <div class="field toolbar-field">
+              <label for="searchInput">Пошук</label>
+              <input
+                id="searchInput"
+                type="text"
+                placeholder="Пошук за назвою, описом, автором"
+              />
+            </div>
+
+            <div class="field toolbar-field">
+              <label for="severityFilter">Критичність</label>
+              <select id="severityFilter">
+                <option value="">Усі</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+
+            <div class="field toolbar-field">
+              <label for="statusFilter">Статус</label>
+              <select id="statusFilter">
+                <option value="">Усі</option>
+                <option value="Open">Open</option>
+                <option value="InProgress">InProgress</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+
+            <div class="field toolbar-field">
+              <label for="sortBySelect">Сортування</label>
+              <select id="sortBySelect">
+                <option value="id">ID</option>
+                <option value="title">Назва</option>
+                <option value="severity">Критичність</option>
+                <option value="status">Статус</option>
+                <option value="authorName">Автор</option>
+              </select>
+            </div>
+
+            <button type="button" id="sortDirBtn" class="secondary-btn" data-dir="desc">
+              Напрям: ↓
+            </button>
+          </div>
+
+          <p id="emptyState" class="empty-state hidden">Немає даних за поточними фільтрами.</p>
+
+          <div id="listContainer" class="table-wrap hidden">
+            <table id="reportsTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Назва</th>
+                  <th>Критичність</th>
+                  <th>Статус</th>
+                  <th>Опис</th>
+                  <th>Автор</th>
+                  <th>Дії</th>
+                </tr>
+              </thead>
+              <tbody id="reportsTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <button type="button" id="prevPageBtn" class="secondary-btn">← Назад</button>
+            <span id="pageInfo" class="muted">Сторінка 1 з 1</span>
+            <button type="button" id="nextPageBtn" class="secondary-btn">Далі →</button>
+          </div>
+
+          <div id="detailPanel" class="detail-panel hidden"></div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

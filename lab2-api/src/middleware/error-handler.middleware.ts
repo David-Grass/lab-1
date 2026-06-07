@@ -3,9 +3,9 @@ import { mapDbError } from "../db/db-errors.js";
 import { ApiError, isSqliteError, toErrorBody } from "../errors/api-error.js";
 
 export function notFoundMiddleware(req: Request, res: Response): void {
-  res.status(404).json(
-    toErrorBody("NOT_FOUND", "Route not found", `path=${req.path}`),
-  );
+  res
+    .status(404)
+    .json(toErrorBody("NOT_FOUND", "Route not found", `path=${req.path}`));
 }
 
 export function errorHandlerMiddleware(
@@ -28,7 +28,7 @@ export function errorHandlerMiddleware(
   }
 
   console.error("Unhandled error:", err);
-  res.status(500).json(
-    toErrorBody("INTERNAL_SERVER_ERROR", "Unexpected server error"),
-  );
+  res
+    .status(500)
+    .json(toErrorBody("INTERNAL_SERVER_ERROR", "Unexpected server error"));
 }
