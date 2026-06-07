@@ -1,0 +1,41 @@
+### ЛР5 — приклади перевірки (REST Client / curl)
+
+@baseUrl = http://localhost:3000/api/v1
+@demoUser1 = 1
+@demoUser2 = 2
+
+### Health + security headers
+GET http://localhost:3000/health
+
+### SQLi — після виправлення (не повинно повертати всі записи)
+GET {{baseUrl}}/reports/search?q=' OR '1'='1
+
+### SQLi — нормальний пошук
+GET {{baseUrl}}/reports/search?q=xss
+
+### IDOR — свій репорт (200)
+GET {{baseUrl}}/reports/1
+X-Demo-UserId: {{demoUser1}}
+
+### IDOR — чужий репорт (403)
+GET {{baseUrl}}/reports/1
+X-Demo-UserId: {{demoUser2}}
+
+### IDOR — без заголовка (401)
+GET {{baseUrl}}/reports/1
+
+### Коментарі (для XSS-демо в UI)
+GET {{baseUrl}}/comments?reportId=1&page=1&pageSize=10
+
+### Create report (потрібен X-Demo-UserId)
+POST {{baseUrl}}/reports
+X-Demo-UserId: {{demoUser1}}
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "title": "Test CSRF report",
+  "severity": "Low",
+  "status": "Open",
+  "description": "Demo report for lab5 verification"
+}

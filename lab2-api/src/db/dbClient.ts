@@ -10,6 +10,8 @@ export type RunResult = {
   changes: number;
 };
 
+export type SqlParams = readonly unknown[];
+
 export class DbClient {
   private readonly db: Database;
 
@@ -17,10 +19,11 @@ export class DbClient {
     this.db = new sqlite3.Database(dbPath);
   }
 
-  async run(sql: string): Promise<RunResult> {
+  async run(sql: string, params: SqlParams = []): Promise<RunResult> {
     return new Promise((resolve, reject) => {
       this.db.run(
         sql,
+        params as unknown[],
         function onRun(this: { lastID: number; changes: number }, err) {
           if (err) {
             reject(err);
@@ -32,9 +35,9 @@ export class DbClient {
     });
   }
 
-  async get<T>(sql: string): Promise<T | undefined> {
+  async get<T>(sql: string, params: SqlParams = []): Promise<T | undefined> {
     return new Promise((resolve, reject) => {
-      this.db.get(sql, (err, row) => {
+      this.db.get(sql, params as unknown[], (err, row) => {
         if (err) {
           reject(err);
           return;
@@ -44,9 +47,9 @@ export class DbClient {
     });
   }
 
-  async all<T>(sql: string): Promise<T[]> {
+  async all<T>(sql: string, params: SqlParams = []): Promise<T[]> {
     return new Promise((resolve, reject) => {
-      this.db.all(sql, (err, rows) => {
+      this.db.all(sql, params as unknown[], (err, rows) => {
         if (err) {
           reject(err);
           return;

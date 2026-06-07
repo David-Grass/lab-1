@@ -11,6 +11,7 @@ import {
 import { ApiError } from "../errors/api-error.js";
 import { reportsRepository } from "../repositories/reports.repository.js";
 import { usersRepository } from "../repositories/users.repository.js";
+import { assertReportOwner } from "./access-control.service.js";
 import { type ListResponse, type ReportStats } from "../types/index.js";
 
 export class ReportsService {
@@ -40,8 +41,8 @@ export class ReportsService {
     };
   }
 
-  async unsafeSearch(term: string): Promise<ReportWithAuthorResponseDto[]> {
-    const items = await reportsRepository.unsafeSearch(term);
+  async search(term: string): Promise<ReportWithAuthorResponseDto[]> {
+    const items = await reportsRepository.search(term);
     return items.map(toReportWithAuthorResponse);
   }
 
@@ -49,28 +50,36 @@ export class ReportsService {
     return reportsRepository.getStats();
   }
 
-  async getById(id: number): Promise<ReportResponseDto> {
+  async getById(id: number, currentUserId: number): Promise<ReportResponseDto> {
     const report = await reportsRepository.getById(id);
     if (!report) {
       throw new ApiError(404, "NOT_FOUND", "Report not found", `id=${id}`);
     }
+    assertReportOwner(report.userId, currentUserId);
     return toReportResponse(report);
   }
 
-  async getByIdWithAuthor(id: number): Promise<ReportWithAuthorResponseDto> {
+  async getByIdWithAuthor(
+    id: number,
+    currentUserId: number,
+  ): Promise<ReportWithAuthorResponseDto> {
     const report = await reportsRepository.getByIdWithAuthor(id);
     if (!report) {
       throw new ApiError(404, "NOT_FOUND", "Report not found", `id=${id}`);
     }
+    assertReportOwner(report.userId, currentUserId);
     return toReportWithAuthorResponse(report);
   }
 
-  async create(dto: CreateReportRequestDto): Promise<ReportResponseDto> {
-    await this.assertUserExists(dto.userId);
-    await this.assertNoDuplicate(dto.title, dto.userId);
+  async create(
+    dto: CreateReportRequestDto,
+    currentUserId: number,
+  ): Promise<ReportResponseDto> {
+    await this.assertUserExists(currentUserId);
+    await this.assertNoDuplicate(dto.title, currentUserId);
 
     const report = await reportsRepository.add(
-      dto.userId,
+      currentUserId,
       dto.title,
       dto.severity,
       dto.status,
@@ -83,38 +92,57 @@ export class ReportsService {
   async update(
     id: number,
     dto: UpdateReportRequestDto,
+    currentUserId: number,
   ): Promise<ReportResponseDto> {
     const existing = await reportsRepository.getById(id);
     if (!existing) {
       throw new ApiError(404, "NOT_FOUND", "Report not found", `id=${id}`);
     }
+    assertReportOwner(existing.userId, currentUserId);
 
-    await this.assertUserExists(dto.userId);
-    await this.assertNoDuplicate(dto.title, dto.userId, id);
+    await this.assertNoDuplicate(dto.title, currentUserId, id);
 
-    const updated = await reportsRepository.update(id, { ...dto });
+    const updated = await reportsRepository.update(id, {
+      userId: currentUserId,
+      title: dto.title,
+      severity: dto.severity,
+      status: dto.status,
+      description: dto.description,
+    });
     return toReportResponse(updated!);
   }
 
   async patch(
     id: number,
     dto: PatchReportRequestDto,
+    currentUserId: number,
   ): Promise<ReportResponseDto> {
     const existing = await reportsRepository.getById(id);
     if (!existing) {
       throw new ApiError(404, "NOT_FOUND", "Report not found", `id=${id}`);
     }
+    assertReportOwner(existing.userId, currentUserId);
 
-    const nextUserId = dto.userId ?? existing.userId;
     const nextTitle = dto.title ?? existing.title;
-    await this.assertUserExists(nextUserId);
-    await this.assertNoDuplicate(nextTitle, nextUserId, id);
+    await this.assertNoDuplicate(nextTitle, currentUserId, id);
 
-    const updated = await reportsRepository.update(id, { ...dto });
+    const updated = await reportsRepository.update(id, {
+      userId: currentUserId,
+      title: nextTitle,
+      severity: dto.severity ?? existing.severity,
+      status: dto.status ?? existing.status,
+      description: dto.description ?? existing.description,
+    });
     return toReportResponse(updated!);
   }
 
-  async delete(id: number): Promise<void> {
+  async delete(id: number, currentUserId: number): Promise<void> {
+    const existing = await reportsRepository.getById(id);
+    if (!existing) {
+      throw new ApiError(404, "NOT_FOUND", "Report not found", `id=${id}`);
+    }
+    assertReportOwner(existing.userId, currentUserId);
+
     const deleted = await reportsRepository.delete(id);
     if (!deleted) {
       throw new ApiError(404, "NOT_FOUND", "Report not found", `id=${id}`);

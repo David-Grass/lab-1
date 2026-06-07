@@ -29,5 +29,5 @@ export const corsMiddleware = cors({
     callback(null, false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
+  allowedHeaders: ["Content-Type", "X-Demo-UserId"],
 });

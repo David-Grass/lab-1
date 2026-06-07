@@ -1,6 +1,7 @@
 import { rethrowDbError } from "../db/db-errors.js";
 import { getDb } from "../db/dbClient.js";
-import { logSql, sqlNum, sqlString } from "../db/sql.js";
+import { logSql, pickSortColumn } from "../db/sql.js";
+import type { ReportListQuery } from "../dtos/reports.dto.js";
 import type {
   Report,
   ReportStats,
@@ -8,7 +9,6 @@ import type {
   Severity,
   Status,
 } from "../types/index.js";
-import type { ReportListQuery } from "../dtos/reports.dto.js";
 
 type ReportRow = {
   id: number;
@@ -42,6 +42,14 @@ type AvgRow = {
   avgComments: number | null;
 };
 
+const SORT_COLUMNS = {
+  id: "r.id",
+  title: "r.title",
+  severity: "r.severity",
+  status: "r.status",
+  authorName: "u.name",
+};
+
 function mapReport(row: ReportRow): Report {
   return {
     id: row.id,
@@ -61,33 +69,34 @@ function mapReportWithAuthor(row: ReportWithAuthorRow): ReportWithAuthor {
   };
 }
 
-function buildWhere(query: ReportListQuery): string {
+function buildWhere(query: ReportListQuery): {
+  where: string;
+  params: unknown[];
+} {
   const conditions: string[] = [];
+  const params: unknown[] = [];
 
   if (query.search) {
-    const term = query.search.toLowerCase().replace(/'/g, "''");
-    conditions.push(
-      `(lower(r.title) LIKE '%${term}%' OR lower(r.description) LIKE '%${term}%')`,
-    );
+    conditions.push("(lower(r.title) LIKE ? OR lower(r.description) LIKE ?)");
+    const term = `%${query.search.toLowerCase()}%`;
+    params.push(term, term);
   }
   if (query.severity) {
-    conditions.push(`r.severity = ${sqlString(query.severity)}`);
+    conditions.push("r.severity = ?");
+    params.push(query.severity);
   }
   if (query.status) {
-    conditions.push(`r.status = ${sqlString(query.status)}`);
+    conditions.push("r.status = ?");
+    params.push(query.status);
   }
   if (query.userId !== undefined) {
-    conditions.push(`r.userId = ${sqlNum(query.userId)}`);
+    conditions.push("r.userId = ?");
+    params.push(query.userId);
   }
 
-  return conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
-}
-
-function sortColumn(sortBy: ReportListQuery["sortBy"]): string {
-  if (sortBy === "authorName") {
-    return "u.name";
-  }
-  return `r.${sortBy}`;
+  const where =
+    conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+  return { where, params };
 }
 
 export class ReportsRepository {
@@ -95,22 +104,24 @@ export class ReportsRepository {
     query: ReportListQuery,
   ): Promise<{ items: Report[]; total: number }> {
     const db = getDb();
-    const where = buildWhere(query);
+    const { where, params } = buildWhere(query);
 
     const countSql = `SELECT COUNT(*) AS total FROM Reports r${where};`;
-    logSql(countSql);
-    const countRow = await db.get<CountRow>(countSql);
+    logSql(countSql, params);
+    const countRow = await db.get<CountRow>(countSql, params);
     const total = countRow?.total ?? 0;
 
     const offset = (query.page - 1) * query.pageSize;
+    const sortColumn = pickSortColumn(query.sortBy, SORT_COLUMNS, "r.id");
     const listSql = `
       SELECT r.id, r.userId, r.title, r.severity, r.status, r.description
       FROM Reports r${where}
-      ORDER BY ${sortColumn(query.sortBy)} ${query.sortDir.toUpperCase()}
-      LIMIT ${sqlNum(query.pageSize)} OFFSET ${sqlNum(offset)};
+      ORDER BY ${sortColumn} ${query.sortDir.toUpperCase()}
+      LIMIT ? OFFSET ?;
     `;
-    logSql(listSql.trim());
-    const rows = await db.all<ReportRow>(listSql);
+    const listParams = [...params, query.pageSize, offset];
+    logSql(listSql.trim(), listParams);
+    const rows = await db.all<ReportRow>(listSql, listParams);
 
     return { items: rows.map(mapReport), total };
   }
@@ -119,18 +130,19 @@ export class ReportsRepository {
     query: ReportListQuery,
   ): Promise<{ items: ReportWithAuthor[]; total: number }> {
     const db = getDb();
-    const where = buildWhere(query);
+    const { where, params } = buildWhere(query);
 
     const countSql = `
       SELECT COUNT(*) AS total
       FROM Reports r
       JOIN Users u ON u.id = r.userId${where};
     `;
-    logSql(countSql.trim());
-    const countRow = await db.get<CountRow>(countSql);
+    logSql(countSql.trim(), params);
+    const countRow = await db.get<CountRow>(countSql, params);
     const total = countRow?.total ?? 0;
 
     const offset = (query.page - 1) * query.pageSize;
+    const sortColumn = pickSortColumn(query.sortBy, SORT_COLUMNS, "r.id");
     const listSql = `
       SELECT
         r.id,
@@ -143,17 +155,19 @@ export class ReportsRepository {
         u.email AS authorEmail
       FROM Reports r
       JOIN Users u ON u.id = r.userId${where}
-      ORDER BY ${sortColumn(query.sortBy)} ${query.sortDir.toUpperCase()}
-      LIMIT ${sqlNum(query.pageSize)} OFFSET ${sqlNum(offset)};
+      ORDER BY ${sortColumn} ${query.sortDir.toUpperCase()}
+      LIMIT ? OFFSET ?;
     `;
-    logSql(listSql.trim());
-    const rows = await db.all<ReportWithAuthorRow>(listSql);
+    const listParams = [...params, query.pageSize, offset];
+    logSql(listSql.trim(), listParams);
+    const rows = await db.all<ReportWithAuthorRow>(listSql, listParams);
 
     return { items: rows.map(mapReportWithAuthor), total };
   }
 
-  async unsafeSearch(term: string): Promise<ReportWithAuthor[]> {
+  async search(term: string): Promise<ReportWithAuthor[]> {
     const db = getDb();
+    const pattern = `%${term}%`;
     const sql = `
       SELECT
         r.id,
@@ -166,12 +180,13 @@ export class ReportsRepository {
         u.email AS authorEmail
       FROM Reports r
       JOIN Users u ON u.id = r.userId
-      WHERE r.title LIKE '%${term}%'
-         OR r.description LIKE '%${term}%'
-         OR u.name LIKE '%${term}%';
+      WHERE r.title LIKE ?
+         OR r.description LIKE ?
+         OR u.name LIKE ?;
     `;
-    logSql(sql.trim());
-    const rows = await db.all<ReportWithAuthorRow>(sql);
+    const params = [pattern, pattern, pattern];
+    logSql(sql.trim(), params);
+    const rows = await db.all<ReportWithAuthorRow>(sql, params);
     return rows.map(mapReportWithAuthor);
   }
 
@@ -244,10 +259,10 @@ export class ReportsRepository {
     const sql = `
       SELECT id, userId, title, severity, status, description
       FROM Reports
-      WHERE id = ${sqlNum(id)};
+      WHERE id = ?;
     `;
-    logSql(sql.trim());
-    const row = await db.get<ReportRow>(sql);
+    logSql(sql.trim(), [id]);
+    const row = await db.get<ReportRow>(sql, [id]);
     return row ? mapReport(row) : undefined;
   }
 
@@ -265,10 +280,10 @@ export class ReportsRepository {
         u.email AS authorEmail
       FROM Reports r
       JOIN Users u ON u.id = r.userId
-      WHERE r.id = ${sqlNum(id)};
+      WHERE r.id = ?;
     `;
-    logSql(sql.trim());
-    const row = await db.get<ReportWithAuthorRow>(sql);
+    logSql(sql.trim(), [id]);
+    const row = await db.get<ReportWithAuthorRow>(sql, [id]);
     return row ? mapReportWithAuthor(row) : undefined;
   }
 
@@ -278,17 +293,19 @@ export class ReportsRepository {
     excludeId?: number,
   ): Promise<Report | undefined> {
     const db = getDb();
-    const exclude =
-      excludeId !== undefined ? ` AND id <> ${sqlNum(excludeId)}` : "";
-    const sql = `
+    const params: unknown[] = [title, userId];
+    let sql = `
       SELECT id, userId, title, severity, status, description
       FROM Reports
-      WHERE lower(trim(title)) = lower(trim(${sqlString(title)}))
-        AND userId = ${sqlNum(userId)}${exclude}
-      LIMIT 1;
-    `;
-    logSql(sql.trim());
-    const row = await db.get<ReportRow>(sql);
+      WHERE lower(trim(title)) = lower(trim(?))
+        AND userId = ?`;
+    if (excludeId !== undefined) {
+      sql += " AND id <> ?";
+      params.push(excludeId);
+    }
+    sql += " LIMIT 1;";
+    logSql(sql.trim(), params);
+    const row = await db.get<ReportRow>(sql, params);
     return row ? mapReport(row) : undefined;
   }
 
@@ -302,18 +319,13 @@ export class ReportsRepository {
     const db = getDb();
     const sql = `
       INSERT INTO Reports (userId, title, severity, status, description)
-      VALUES (
-        ${sqlNum(userId)},
-        ${sqlString(title)},
-        ${sqlString(severity)},
-        ${sqlString(status)},
-        ${sqlString(description)}
-      );
+      VALUES (?, ?, ?, ?, ?);
     `;
-    logSql(sql.trim());
+    const params = [userId, title, severity, status, description];
+    logSql(sql.trim(), params);
 
     try {
-      const result = await db.run(sql);
+      const result = await db.run(sql, params);
       const created = await this.getById(result.lastID);
       if (!created) {
         throw new Error("Failed to load created report");
@@ -337,18 +349,21 @@ export class ReportsRepository {
     const db = getDb();
     const sql = `
       UPDATE Reports
-      SET
-        userId = ${sqlNum(next.userId)},
-        title = ${sqlString(next.title)},
-        severity = ${sqlString(next.severity)},
-        status = ${sqlString(next.status)},
-        description = ${sqlString(next.description)}
-      WHERE id = ${sqlNum(id)};
+      SET userId = ?, title = ?, severity = ?, status = ?, description = ?
+      WHERE id = ?;
     `;
-    logSql(sql.trim());
+    const params = [
+      next.userId,
+      next.title,
+      next.severity,
+      next.status,
+      next.description,
+      id,
+    ];
+    logSql(sql.trim(), params);
 
     try {
-      await db.run(sql);
+      await db.run(sql, params);
       return this.getById(id);
     } catch (error) {
       rethrowDbError(error);
@@ -357,11 +372,11 @@ export class ReportsRepository {
 
   async delete(id: number): Promise<boolean> {
     const db = getDb();
-    const sql = `DELETE FROM Reports WHERE id = ${sqlNum(id)};`;
-    logSql(sql);
+    const sql = `DELETE FROM Reports WHERE id = ?;`;
+    logSql(sql, [id]);
 
     try {
-      const result = await db.run(sql);
+      const result = await db.run(sql, [id]);
       return result.changes > 0;
     } catch (error) {
       rethrowDbError(error);

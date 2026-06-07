@@ -12,6 +12,9 @@ const DEFAULT_BY_CODE: Record<string, string> = {
   NOT_NULL_CONSTRAINT: "Заповніть усі обов’язкові поля.",
   CHECK_CONSTRAINT:
     "Деякі значення не відповідають правилам. Перевірте форму.",
+  UNAUTHORIZED:
+    "Потрібна ідентифікація. Оберіть поточного користувача (X-Demo-UserId).",
+  FORBIDDEN: "Доступ заборонено. Цей репорт належить іншому користувачу.",
   NETWORK_ERROR:
     "Не вдалося з’єднатися з сервером. Запустіть API (порт 3000) і оновіть сторінку.",
   INTERNAL_SERVER_ERROR:

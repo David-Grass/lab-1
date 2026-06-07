@@ -333,6 +333,37 @@ th {
   align-items: center;
 }
 
+.demo-user {
+  min-width: 220px;
+}
+
+.demo-user label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.comments-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.comment-item {
+  margin-bottom: 10px;
+}
+
+.comment-meta {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.comment-body {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 900px) {
   .layout {
     flex-direction: column;

@@ -5,6 +5,7 @@ import {
   notFoundMiddleware,
 } from "./middleware/error-handler.middleware.js";
 import { requestLoggingMiddleware } from "./middleware/request-logging.middleware.js";
+import { securityHeadersMiddleware } from "./middleware/security-headers.middleware.js";
 import { commentsRouter } from "./routes/comments.routes.js";
 import { reportsRouter } from "./routes/reports.routes.js";
 import { usersRouter } from "./routes/users.routes.js";
@@ -20,6 +21,8 @@ function createApiRouter() {
 export function createApp() {
   const app = express();
 
+  app.disable("x-powered-by");
+  app.use(securityHeadersMiddleware);
   app.use(corsMiddleware);
   app.options(/.*/, corsMiddleware);
   app.use(express.json());

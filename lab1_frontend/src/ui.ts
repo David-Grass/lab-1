@@ -1,5 +1,6 @@
 import type {
   ApiErrorPayload,
+  CommentDto,
   FieldErrors,
   ReportFormValues,
   ReportListQuery,
@@ -36,6 +37,7 @@ export type UiElements = {
   reportsTableBody: HTMLTableSectionElement;
   emptyState: HTMLElement;
   counterText: HTMLElement;
+  demoUserSelect: HTMLSelectElement;
   fieldErrors: Record<keyof ReportFormValues, HTMLElement>;
 };
 
@@ -68,6 +70,7 @@ export function getUiElements(): UiElements {
     reportsTableBody: document.getElementById("reportsTableBody") as HTMLTableSectionElement,
     emptyState: document.getElementById("emptyState")!,
     counterText: document.getElementById("counterText")!,
+    demoUserSelect: document.getElementById("demoUserSelect") as HTMLSelectElement,
     fieldErrors: {
       userId: document.getElementById("userError")!,
       title: document.getElementById("titleError")!,
@@ -118,14 +121,33 @@ export function setFormBusy(
 }
 
 export function renderUsersSelect(select: HTMLSelectElement, users: UserDto[]): void {
-  select.innerHTML =
-    '<option value="">Оберіть автора</option>' +
-    users
-      .map(
-        (user) =>
-          `<option value="${user.id}">${escapeHtml(user.name)} (${escapeHtml(user.email)})</option>`,
-      )
-      .join("");
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Оберіть автора";
+  select.append(placeholder);
+
+  for (const user of users) {
+    const option = document.createElement("option");
+    option.value = String(user.id);
+    option.textContent = `${user.name} (${user.email})`;
+    select.append(option);
+  }
+}
+
+export function renderDemoUserSelect(
+  select: HTMLSelectElement,
+  users: UserDto[],
+  selectedId: number,
+): void {
+  select.replaceChildren();
+  for (const user of users) {
+    const option = document.createElement("option");
+    option.value = String(user.id);
+    option.textContent = `${user.name} (id=${user.id})`;
+    option.selected = user.id === selectedId;
+    select.append(option);
+  }
 }
 
 export function renderFieldErrors(
@@ -210,25 +232,53 @@ export function renderReportsTable(
   ui.emptyState.classList.toggle("hidden", reports.length > 0);
   ui.listContainer.classList.toggle("hidden", reports.length === 0);
 
-  ui.reportsTableBody.innerHTML = reports
-    .map((report, index) => {
-      const rowNum = (page - 1) * pageSize + index + 1;
-      return `
-        <tr>
-          <td>${rowNum}</td>
-          <td>${escapeHtml(report.title)}</td>
-          <td><span class="badge badge-${report.severity.toLowerCase()}">${report.severity}</span></td>
-          <td>${escapeHtml(report.status)}</td>
-          <td class="description-cell">${escapeHtml(report.description)}</td>
-          <td>${escapeHtml(report.authorName)}</td>
-          <td>
-            <button type="button" class="action-btn view-btn" data-id="${report.id}">Деталі</button>
-            <button type="button" class="action-btn edit-btn" data-id="${report.id}">Редаг.</button>
-            <button type="button" class="action-btn delete-btn" data-id="${report.id}">Видал.</button>
-          </td>
-        </tr>`;
-    })
-    .join("");
+  ui.reportsTableBody.replaceChildren();
+
+  reports.forEach((report, index) => {
+    const rowNum = (page - 1) * pageSize + index + 1;
+    const row = document.createElement("tr");
+
+    const cells = [
+      String(rowNum),
+      report.title,
+      report.severity,
+      report.status,
+      report.description,
+      report.authorName,
+    ];
+
+    for (const [idx, value] of cells.entries()) {
+      const td = document.createElement("td");
+      if (idx === 2) {
+        const badge = document.createElement("span");
+        badge.className = `badge badge-${report.severity.toLowerCase()}`;
+        badge.textContent = value;
+        td.append(badge);
+      } else if (idx === 4) {
+        td.className = "description-cell";
+        td.textContent = value;
+      } else {
+        td.textContent = value;
+      }
+      row.append(td);
+    }
+
+    const actionsCell = document.createElement("td");
+    for (const [label, className] of [
+      ["Деталі", "view-btn"],
+      ["Редаг.", "edit-btn"],
+      ["Видал.", "delete-btn"],
+    ] as const) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `action-btn ${className}`;
+      btn.dataset.id = String(report.id);
+      btn.textContent = label;
+      actionsCell.append(btn);
+    }
+    row.append(actionsCell);
+    ui.reportsTableBody.append(row);
+  });
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   ui.pageInfo.textContent = `Сторінка ${page} з ${totalPages}`;
@@ -238,31 +288,79 @@ export function renderReportsTable(
     ui.sortDirBtn.dataset.dir === "asc" ? "Напрям: ↑" : "Напрям: ↓";
 }
 
-export function renderDetail(panel: HTMLElement, report: ReportWithAuthorDto): void {
+function appendLabelParagraph(
+  parent: HTMLElement,
+  label: string,
+  value: string,
+): void {
+  const p = document.createElement("p");
+  const strong = document.createElement("strong");
+  strong.textContent = `${label}: `;
+  p.append(strong, document.createTextNode(value));
+  parent.append(p);
+}
+
+export function renderDetail(
+  panel: HTMLElement,
+  report: ReportWithAuthorDto,
+  comments: CommentDto[],
+): void {
   panel.classList.remove("hidden");
-  panel.innerHTML = `
-    <h3>Деталі репорту #${report.id}</h3>
-    <p><strong>Назва:</strong> ${escapeHtml(report.title)}</p>
-    <p><strong>Критичність:</strong> ${escapeHtml(report.severity)}</p>
-    <p><strong>Статус:</strong> ${escapeHtml(report.status)}</p>
-    <p><strong>Автор:</strong> ${escapeHtml(report.authorName)} (${escapeHtml(report.authorEmail)})</p>
-    <p><strong>Опис:</strong> ${escapeHtml(report.description)}</p>
-  `;
+  panel.replaceChildren();
+
+  const title = document.createElement("h3");
+  title.textContent = `Деталі репорту #${report.id}`;
+  panel.append(title);
+
+  appendLabelParagraph(panel, "Назва", report.title);
+  appendLabelParagraph(panel, "Критичність", report.severity);
+  appendLabelParagraph(panel, "Статус", report.status);
+  appendLabelParagraph(
+    panel,
+    "Автор",
+    `${report.authorName} (${report.authorEmail})`,
+  );
+  appendLabelParagraph(panel, "Опис", report.description);
+
+  const commentsTitle = document.createElement("h4");
+  commentsTitle.textContent = "Коментарі";
+  panel.append(commentsTitle);
+
+  if (comments.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "Коментарів немає.";
+    panel.append(empty);
+    return;
+  }
+
+  const list = document.createElement("ul");
+  list.className = "comments-list";
+
+  for (const comment of comments) {
+    const item = document.createElement("li");
+    item.className = "comment-item";
+
+    const meta = document.createElement("p");
+    meta.className = "comment-meta";
+    meta.textContent = `${comment.authorName} · #${comment.id}`;
+
+    const body = document.createElement("p");
+    body.className = "comment-body";
+    body.textContent = comment.body;
+
+    item.append(meta, body);
+    list.append(item);
+  }
+
+  panel.append(list);
 }
 
 export function hideDetail(panel: HTMLElement): void {
   panel.classList.add("hidden");
-  panel.innerHTML = "";
+  panel.replaceChildren();
 }
 
 export function formatApiError(error: ApiErrorPayload): string {
   return toUserMessage(error);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

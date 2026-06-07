@@ -1,11 +1,11 @@
 import { rethrowDbError } from "../db/db-errors.js";
 import { getDb } from "../db/dbClient.js";
-import { logSql, sqlNum, sqlString } from "../db/sql.js";
+import { logSql, pickSortColumn } from "../db/sql.js";
+import type { CommentListQuery } from "../dtos/comments.dto.js";
 import type {
   ReportComment,
   ReportCommentWithDetails,
 } from "../types/index.js";
-import type { CommentListQuery } from "../dtos/comments.dto.js";
 
 type CommentRow = {
   id: number;
@@ -21,6 +21,12 @@ type CommentWithDetailsRow = CommentRow & {
 
 type CountRow = {
   total: number;
+};
+
+const SORT_COLUMNS = {
+  id: "c.id",
+  reportId: "c.reportId",
+  userId: "c.userId",
 };
 
 function mapComment(row: CommentRow): ReportComment {
@@ -42,21 +48,29 @@ function mapCommentWithDetails(
   };
 }
 
-function buildWhere(query: CommentListQuery): string {
+function buildWhere(query: CommentListQuery): {
+  where: string;
+  params: unknown[];
+} {
   const conditions: string[] = [];
+  const params: unknown[] = [];
 
   if (query.reportId !== undefined) {
-    conditions.push(`c.reportId = ${sqlNum(query.reportId)}`);
+    conditions.push("c.reportId = ?");
+    params.push(query.reportId);
   }
   if (query.userId !== undefined) {
-    conditions.push(`c.userId = ${sqlNum(query.userId)}`);
+    conditions.push("c.userId = ?");
+    params.push(query.userId);
   }
   if (query.search) {
-    const term = query.search.toLowerCase().replace(/'/g, "''");
-    conditions.push(`lower(c.body) LIKE '%${term}%'`);
+    conditions.push("lower(c.body) LIKE ?");
+    params.push(`%${query.search.toLowerCase()}%`);
   }
 
-  return conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+  const where =
+    conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+  return { where, params };
 }
 
 export class CommentsRepository {
@@ -64,7 +78,7 @@ export class CommentsRepository {
     query: CommentListQuery,
   ): Promise<{ items: ReportCommentWithDetails[]; total: number }> {
     const db = getDb();
-    const where = buildWhere(query);
+    const { where, params } = buildWhere(query);
 
     const countSql = `
       SELECT COUNT(*) AS total
@@ -72,11 +86,12 @@ export class CommentsRepository {
       JOIN Users u ON u.id = c.userId
       JOIN Reports r ON r.id = c.reportId${where};
     `;
-    logSql(countSql.trim());
-    const countRow = await db.get<CountRow>(countSql);
+    logSql(countSql.trim(), params);
+    const countRow = await db.get<CountRow>(countSql, params);
     const total = countRow?.total ?? 0;
 
     const offset = (query.page - 1) * query.pageSize;
+    const sortColumn = pickSortColumn(query.sortBy, SORT_COLUMNS, "c.id");
     const listSql = `
       SELECT
         c.id,
@@ -88,11 +103,12 @@ export class CommentsRepository {
       FROM ReportComments c
       JOIN Users u ON u.id = c.userId
       JOIN Reports r ON r.id = c.reportId${where}
-      ORDER BY c.${query.sortBy} ${query.sortDir.toUpperCase()}
-      LIMIT ${sqlNum(query.pageSize)} OFFSET ${sqlNum(offset)};
+      ORDER BY ${sortColumn} ${query.sortDir.toUpperCase()}
+      LIMIT ? OFFSET ?;
     `;
-    logSql(listSql.trim());
-    const rows = await db.all<CommentWithDetailsRow>(listSql);
+    const listParams = [...params, query.pageSize, offset];
+    logSql(listSql.trim(), listParams);
+    const rows = await db.all<CommentWithDetailsRow>(listSql, listParams);
 
     return { items: rows.map(mapCommentWithDetails), total };
   }
@@ -102,10 +118,10 @@ export class CommentsRepository {
     const sql = `
       SELECT id, reportId, userId, body
       FROM ReportComments
-      WHERE id = ${sqlNum(id)};
+      WHERE id = ?;
     `;
-    logSql(sql.trim());
-    const row = await db.get<CommentRow>(sql);
+    logSql(sql.trim(), [id]);
+    const row = await db.get<CommentRow>(sql, [id]);
     return row ? mapComment(row) : undefined;
   }
 
@@ -124,10 +140,10 @@ export class CommentsRepository {
       FROM ReportComments c
       JOIN Users u ON u.id = c.userId
       JOIN Reports r ON r.id = c.reportId
-      WHERE c.id = ${sqlNum(id)};
+      WHERE c.id = ?;
     `;
-    logSql(sql.trim());
-    const row = await db.get<CommentWithDetailsRow>(sql);
+    logSql(sql.trim(), [id]);
+    const row = await db.get<CommentWithDetailsRow>(sql, [id]);
     return row ? mapCommentWithDetails(row) : undefined;
   }
 
@@ -139,12 +155,13 @@ export class CommentsRepository {
     const db = getDb();
     const sql = `
       INSERT INTO ReportComments (reportId, userId, body)
-      VALUES (${sqlNum(reportId)}, ${sqlNum(userId)}, ${sqlString(body)});
+      VALUES (?, ?, ?);
     `;
-    logSql(sql.trim());
+    const params = [reportId, userId, body];
+    logSql(sql.trim(), params);
 
     try {
-      const result = await db.run(sql);
+      const result = await db.run(sql, params);
       const created = await this.getById(result.lastID);
       if (!created) {
         throw new Error("Failed to load created comment");
@@ -168,16 +185,14 @@ export class CommentsRepository {
     const db = getDb();
     const sql = `
       UPDATE ReportComments
-      SET
-        reportId = ${sqlNum(next.reportId)},
-        userId = ${sqlNum(next.userId)},
-        body = ${sqlString(next.body)}
-      WHERE id = ${sqlNum(id)};
+      SET reportId = ?, userId = ?, body = ?
+      WHERE id = ?;
     `;
-    logSql(sql.trim());
+    const params = [next.reportId, next.userId, next.body, id];
+    logSql(sql.trim(), params);
 
     try {
-      await db.run(sql);
+      await db.run(sql, params);
       return this.getById(id);
     } catch (error) {
       rethrowDbError(error);
@@ -186,11 +201,11 @@ export class CommentsRepository {
 
   async delete(id: number): Promise<boolean> {
     const db = getDb();
-    const sql = `DELETE FROM ReportComments WHERE id = ${sqlNum(id)};`;
-    logSql(sql);
+    const sql = `DELETE FROM ReportComments WHERE id = ?;`;
+    logSql(sql, [id]);
 
     try {
-      const result = await db.run(sql);
+      const result = await db.run(sql, [id]);
       return result.changes > 0;
     } catch (error) {
       rethrowDbError(error);

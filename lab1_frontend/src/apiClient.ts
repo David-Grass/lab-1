@@ -1,6 +1,7 @@
 import { API_BASE_URL, REQUEST_TIMEOUT_MS } from "./config";
 import type {
   ApiErrorPayload,
+  CommentDto,
   CreateReportDto,
   ItemResponse,
   ListResponse,
@@ -18,6 +19,22 @@ type BackendErrorBody = {
     details?: string | null;
   };
 };
+
+let demoUserId: number = 1;
+
+export function getDemoUserId(): number {
+  return demoUserId;
+}
+
+export function setDemoUserId(id: number): void {
+  demoUserId = id;
+}
+
+function buildHeaders(extra?: HeadersInit): Headers {
+  const headers = new Headers(extra);
+  headers.set("X-Demo-UserId", String(demoUserId));
+  return headers;
+}
 
 function buildQuery(params: ReportListQuery): string {
   const search = new URLSearchParams();
@@ -57,10 +74,11 @@ async function request<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
+  const headers = buildHeaders(options.headers);
 
   let response: Response;
   try {
-    response = await fetch(url, { ...options, signal });
+    response = await fetch(url, { ...options, headers, signal });
   } catch (error) {
     const err: ApiErrorPayload = {
       status: 0,
@@ -145,6 +163,18 @@ export async function getReportById(
   return result.data;
 }
 
+export async function getCommentsByReportId(
+  reportId: number,
+  signal?: AbortSignal,
+): Promise<CommentDto[]> {
+  const result = await request<ListResponse<CommentDto>>(
+    `/comments?reportId=${reportId}&page=1&pageSize=50&sortBy=id&sortDir=asc`,
+    {},
+    signal,
+  );
+  return result.data;
+}
+
 export async function createReport(
   dto: CreateReportDto,
   signal?: AbortSignal,
@@ -154,7 +184,7 @@ export async function createReport(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(dto),
+      body: JSON.stringify({ ...dto, userId: demoUserId }),
     },
     signal,
   );
@@ -171,7 +201,7 @@ export async function updateReport(
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(dto),
+      body: JSON.stringify({ ...dto, userId: demoUserId }),
     },
     signal,
   );

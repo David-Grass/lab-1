@@ -1,8 +1,8 @@
 {
   "name": "lab1_frontend",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "ЛР4 – фронтенд TypeScript + fetch для сервісу репортів (варіант 6)",
+  "description": "ЛР5 – фронтенд TypeScript + безпечний рендер (варіант 6)",
   "type": "module",
   "scripts": {
     "dev": "vite",

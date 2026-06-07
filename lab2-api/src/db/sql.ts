@@ -1,18 +1,18 @@
-export function esc(s: string): string {
-  return s.replace(/'/g, "''");
-}
+import type { SqlParams } from "./dbClient.js";
 
-export function sqlString(s: string): string {
-  return `'${esc(s)}'`;
-}
-
-export function sqlNum(n: number): string {
-  if (!Number.isFinite(n)) {
-    throw new Error("Invalid SQL number");
+export function logSql(sql: string, params: SqlParams = []): void {
+  if (params.length === 0) {
+    console.log("[SQL]", sql);
+    return;
   }
-  return String(Math.trunc(n));
+  console.log("[SQL]", sql, params);
 }
 
-export function logSql(sql: string): void {
-  console.log("[SQL]", sql);
+/** Allowlist for ORDER BY column identifiers (not parameterizable in SQLite). */
+export function pickSortColumn(
+  sortBy: string,
+  allowed: Record<string, string>,
+  fallback: string,
+): string {
+  return allowed[sortBy] ?? allowed[fallback] ?? fallback;
 }

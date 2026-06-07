@@ -1,3 +1,27 @@
+# ЛР5 – REST API + SQLite + Security (варіант 6)
+
+> **ЛР5:** параметризований SQL, IDOR-захист (`X-Demo-UserId`), security headers.  
+> Звіт: [`../LAB5-REPORT.md`](../LAB5-REPORT.md) · Приклади: [`requests.http`](requests.http)  
+> **Тег:** `0.5.0`
+
+## 5.1. Запуск
+
+```powershell
+cd lab2-api
+npm.cmd run seed
+npm.cmd run dev
+
+cd ../lab1_frontend
+npm.cmd run dev
+```
+
+Фронт: http://localhost:5173 · API: http://localhost:3000/api/v1
+
+**IDOR:** захищені `GET/PATCH/DELETE /reports/:id` — потрібен заголовок `X-Demo-UserId: 1|2`.  
+На фронтенді — селект «Поточний користувач».
+
+---
+
 # ЛР4 – REST API + SQLite + CORS (варіант 6)
 
 > **ЛР4:** фронтенд у `../lab1_frontend/` (TypeScript, fetch). API доступне на **`/api/v1/...`** і **`/api/...`**. CORS дозволяє `http://localhost:5173` та `:5500`.

@@ -72,3 +72,12 @@ export type ReportFormValues = {
 };
 
 export type FieldErrors = Partial<Record<keyof ReportFormValues, string>>;
+
+export type CommentDto = {
+  id: number;
+  reportId: number;
+  userId: number;
+  body: string;
+  authorName: string;
+  reportTitle: string;
+};

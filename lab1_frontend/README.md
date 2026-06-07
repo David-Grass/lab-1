@@ -1,3 +1,17 @@
+# ЛР5 – Frontend (TypeScript + безпечний рендер)
+
+**Варіант 6:** XSS-захист (DOM API + `textContent`), demo user для IDOR.
+
+> Звіт: [`../LAB5-REPORT.md`](../LAB5-REPORT.md) · **Тег:** `0.5.0`
+
+## ЛР5 — що змінилось
+
+- Селект **«Поточний користувач»** → заголовок `X-Demo-UserId`
+- Рендер таблиці/деталей/коментарів через **createElement + textContent** (без `innerHTML`)
+- Коментарі в панелі «Деталі» (демонстрація stored XSS fix)
+
+---
+
 # ЛР4 – Frontend (TypeScript + fetch)
 
 **Варіант 6:** інтеграція UI з `lab2-api` через `/api/v1`.
@@ -51,6 +65,3 @@ lab1_frontend/
 - CORS whitelist на бекенді
 - TypeScript + таймаут/скасування запиту (15 с)
 
-## Тег git
-
-Після здачі: `0.4.0`

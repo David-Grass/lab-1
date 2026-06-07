@@ -1,9 +1,12 @@
 import {
   createReport,
   deleteReport,
+  getCommentsByReportId,
   getReportById,
   getReports,
   getUsers,
+  getDemoUserId,
+  setDemoUserId,
   updateReport,
   withTimeout,
 } from "./apiClient";
@@ -18,6 +21,7 @@ import {
   readListQuery,
   renderDetail,
   renderFieldErrors,
+  renderDemoUserSelect,
   renderReportsTable,
   renderUsersSelect,
   resetFormUi,
@@ -102,8 +106,11 @@ async function loadReports(): Promise<void> {
 
 async function showReportDetails(id: number): Promise<void> {
   try {
-    const report = await getReportById(id);
-    renderDetail(ui.detailPanel, report);
+    const [report, comments] = await Promise.all([
+      getReportById(id),
+      getCommentsByReportId(id),
+    ]);
+    renderDetail(ui.detailPanel, report, comments);
   } catch (error) {
     if (isApiError(error)) {
       showNotice(ui.notice, formatApiError(error), "error");
@@ -270,6 +277,19 @@ function attachHandlers(): void {
       void handleDelete(id);
     }
   });
+
+  ui.demoUserSelect.addEventListener("change", () => {
+    const nextId = Number(ui.demoUserSelect.value);
+    if (!nextId) return;
+    setDemoUserId(nextId);
+    ui.userSelect.value = String(nextId);
+    clearNotice(ui.notice);
+    showNotice(
+      ui.notice,
+      `Поточний користувач: id=${nextId} (заголовок X-Demo-UserId)`,
+      "info",
+    );
+  });
 }
 
 async function bootstrap(): Promise<void> {
@@ -277,7 +297,10 @@ async function bootstrap(): Promise<void> {
   ui.sortDirBtn.dataset.dir = "desc";
 
   try {
-    await loadUsers();
+    state.users = await getUsers();
+    renderUsersSelect(ui.userSelect, state.users);
+    renderDemoUserSelect(ui.demoUserSelect, state.users, getDemoUserId());
+    ui.userSelect.value = String(getDemoUserId());
     await loadReports();
   } catch (error) {
     if (isApiError(error)) {
