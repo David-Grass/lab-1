@@ -11,53 +11,101 @@ import { parseRouteId } from "../utils/params.js";
 type RequestWithQuery<T> = Request & { validatedQuery: T };
 
 export class ReportsController {
-  list(req: Request, res: Response, next: NextFunction): void {
+  async list(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const query = (req as RequestWithQuery<ReportListQuery>).validatedQuery;
-      res.status(200).json(reportsService.list(query));
+      const result = await reportsService.list(query);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  getById(req: Request, res: Response, next: NextFunction): void {
+  async listWithAuthors(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      res.status(200).json(reportsService.getById(parseRouteId(req, "id")));
+      const query = (req as RequestWithQuery<ReportListQuery>).validatedQuery;
+      const result = await reportsService.listWithAuthors(query);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  create(req: Request, res: Response, next: NextFunction): void {
+  async unsafeSearch(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const term = (req as RequestWithQuery<{ q: string }>).validatedQuery.q;
+      const data = await reportsService.unsafeSearch(term);
+      res.status(200).json({ data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async stats(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await reportsService.getStats();
+      res.status(200).json({ data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getById(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await reportsService.getByIdWithAuthor(
+        parseRouteId(req, "id"),
+      );
+      res.status(200).json({ data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const dto = req.body as CreateReportRequestDto;
-      res.status(201).json(reportsService.create(dto));
+      const result = await reportsService.create(dto);
+      res.status(201).json({ data: result });
     } catch (error) {
       next(error);
     }
   }
 
-  update(req: Request, res: Response, next: NextFunction): void {
+  async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const dto = req.body as UpdateReportRequestDto;
-      res.status(200).json(reportsService.update(parseRouteId(req, "id"), dto));
+      const result = await reportsService.update(parseRouteId(req, "id"), dto);
+      res.status(200).json({ data: result });
     } catch (error) {
       next(error);
     }
   }
 
-  patch(req: Request, res: Response, next: NextFunction): void {
+  async patch(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const dto = req.body as PatchReportRequestDto;
-      res.status(200).json(reportsService.patch(parseRouteId(req, "id"), dto));
+      const result = await reportsService.patch(parseRouteId(req, "id"), dto);
+      res.status(200).json({ data: result });
     } catch (error) {
       next(error);
     }
   }
 
-  delete(req: Request, res: Response, next: NextFunction): void {
+  async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      reportsService.delete(parseRouteId(req, "id"));
+      await reportsService.delete(parseRouteId(req, "id"));
       res.status(204).send();
     } catch (error) {
       next(error);

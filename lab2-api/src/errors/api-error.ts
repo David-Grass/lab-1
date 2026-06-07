@@ -1,18 +1,31 @@
-export type ValidationDetail = {
-  field: string;
-  message: string;
+export type ErrorDetails = string | null;
+
+export type ErrorBody = {
+  error: {
+    code: string;
+    message: string;
+    details: ErrorDetails;
+  };
 };
+
+export function toErrorBody(
+  code: string,
+  message: string,
+  details: ErrorDetails = null,
+): ErrorBody {
+  return { error: { code, message, details } };
+}
 
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  readonly details: ValidationDetail[] | null;
+  readonly details: ErrorDetails;
 
   constructor(
     status: number,
     code: string,
     message: string,
-    details: ValidationDetail[] | null = null,
+    details: ErrorDetails = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -20,4 +33,12 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
   }
+
+  toBody(): ErrorBody {
+    return toErrorBody(this.code, this.message, this.details);
+  }
+}
+
+export function isSqliteError(error: unknown): error is Error {
+  return error instanceof Error && error.message.includes("SQLITE_CONSTRAINT");
 }

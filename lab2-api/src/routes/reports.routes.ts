@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   parseReportListQuery,
+  parseUnsafeSearchQuery,
   validateCreateReportDto,
   validatePatchReportDto,
   validateUpdateReportDto,
@@ -13,6 +14,17 @@ import {
 
 export const reportsRouter = Router();
 
+reportsRouter.get(
+  "/with-authors",
+  validateQuery(parseReportListQuery),
+  reportsController.listWithAuthors.bind(reportsController),
+);
+reportsRouter.get("/stats", reportsController.stats.bind(reportsController));
+reportsRouter.get(
+  "/search",
+  validateQuery(parseUnsafeSearchQuery),
+  reportsController.unsafeSearch.bind(reportsController),
+);
 reportsRouter.get(
   "/",
   validateQuery(parseReportListQuery),

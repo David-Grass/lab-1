@@ -2,6 +2,7 @@ import {
   STATUSES,
   SEVERITIES,
   type Report,
+  type ReportWithAuthor,
   type Severity,
   type Status,
 } from "../types/index.js";
@@ -13,63 +14,87 @@ import {
 } from "../validation/validators.js";
 
 export type CreateReportRequestDto = {
+  userId: number;
   title: string;
   severity: Severity;
   status: Status;
   description: string;
-  reporter: string;
 };
 
 export type UpdateReportRequestDto = {
+  userId: number;
   title: string;
   severity: Severity;
   status: Status;
   description: string;
-  reporter: string;
 };
 
 export type PatchReportRequestDto = {
+  userId?: number;
   title?: string;
   severity?: Severity;
   status?: Status;
   description?: string;
-  reporter?: string;
 };
 
 export type ReportResponseDto = {
   id: number;
+  userId: number;
   title: string;
   severity: Severity;
   status: Status;
   description: string;
-  reporter: string;
+};
+
+export type ReportWithAuthorResponseDto = ReportResponseDto & {
+  authorName: string;
+  authorEmail: string;
 };
 
 export type ReportListQuery = {
   search?: string;
   severity?: Severity;
   status?: Status;
-  sortBy: "id" | "title" | "severity" | "status" | "reporter";
+  userId?: number;
+  sortBy: "id" | "title" | "severity" | "status" | "userId" | "authorName";
   sortDir: "asc" | "desc";
   page: number;
   pageSize: number;
 };
 
-const SORT_FIELDS = ["id", "title", "severity", "status", "reporter"] as const;
+const SORT_FIELDS = [
+  "id",
+  "title",
+  "severity",
+  "status",
+  "userId",
+  "authorName",
+] as const;
 
-const severityRank: Record<Severity, number> = {
-  Low: 1,
-  Medium: 2,
-  High: 3,
-  Critical: 4,
-};
+function validateUserId(
+  value: unknown,
+  partial: boolean,
+): ReturnType<typeof collectErrors>[number] | null {
+  if (partial && value === undefined) {
+    return null;
+  }
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 1) {
+    return { field: "userId", message: "userId must be a positive integer" };
+  }
+  return null;
+}
 
 function validateReportFields(
   dto: Record<string, unknown>,
   partial: boolean,
-): ValidationErrors {
+): ReturnType<typeof collectErrors> {
   const errors = [];
 
+  const userIdError = validateUserId(dto.userId, partial);
+  if (userIdError) {
+    errors.push(userIdError);
+  }
   if (!partial || dto.title !== undefined) {
     errors.push(requireString(dto.title, "title", 3, 80));
   }
@@ -82,14 +107,9 @@ function validateReportFields(
   if (!partial || dto.description !== undefined) {
     errors.push(requireString(dto.description, "description", 10, 500));
   }
-  if (!partial || dto.reporter !== undefined) {
-    errors.push(requireString(dto.reporter, "reporter", 2, 40));
-  }
 
   return collectErrors(errors);
 }
-
-type ValidationErrors = ReturnType<typeof collectErrors>;
 
 function assertObjectBody(body: unknown): Record<string, unknown> {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
@@ -109,11 +129,11 @@ export function validateCreateReportDto(body: unknown): CreateReportRequestDto {
   assertValid(errors);
 
   return {
+    userId: Number(dto.userId),
     title: (dto.title as string).trim(),
     severity: dto.severity as Severity,
     status: (dto.status as Status | undefined) ?? "Open",
     description: (dto.description as string).trim(),
-    reporter: (dto.reporter as string).trim(),
   };
 }
 
@@ -122,11 +142,11 @@ export function validateUpdateReportDto(body: unknown): UpdateReportRequestDto {
   assertValid(validateReportFields(dto, false));
 
   return {
+    userId: Number(dto.userId),
     title: (dto.title as string).trim(),
     severity: dto.severity as Severity,
     status: dto.status as Status,
     description: (dto.description as string).trim(),
-    reporter: (dto.reporter as string).trim(),
   };
 }
 
@@ -144,13 +164,12 @@ export function validatePatchReportDto(body: unknown): PatchReportRequestDto {
   assertValid(errors);
 
   const result: PatchReportRequestDto = {};
+  if (dto.userId !== undefined) result.userId = Number(dto.userId);
   if (dto.title !== undefined) result.title = (dto.title as string).trim();
   if (dto.severity !== undefined) result.severity = dto.severity as Severity;
   if (dto.status !== undefined) result.status = dto.status as Status;
   if (dto.description !== undefined)
     result.description = (dto.description as string).trim();
-  if (dto.reporter !== undefined)
-    result.reporter = (dto.reporter as string).trim();
   return result;
 }
 
@@ -205,6 +224,15 @@ export function parseReportListQuery(
       });
     }
   }
+  if (query.userId !== undefined && query.userId !== "") {
+    const userId = Number(query.userId);
+    if (!Number.isInteger(userId) || userId < 1) {
+      errors.push({
+        field: "userId",
+        message: "userId must be a positive integer",
+      });
+    }
+  }
 
   assertValid(errors);
 
@@ -221,6 +249,10 @@ export function parseReportListQuery(
       query.status && String(query.status)
         ? (String(query.status) as Status)
         : undefined,
+    userId:
+      query.userId !== undefined && query.userId !== ""
+        ? Number(query.userId)
+        : undefined,
     sortBy: sortByRaw as ReportListQuery["sortBy"],
     sortDir: sortDirRaw as "asc" | "desc",
     page,
@@ -228,37 +260,32 @@ export function parseReportListQuery(
   };
 }
 
+export function parseUnsafeSearchQuery(query: Record<string, unknown>): {
+  q: string;
+} {
+  if (typeof query.q !== "string" || !query.q.trim()) {
+    assertValid([{ field: "q", message: "Query parameter q is required" }]);
+  }
+  return { q: (query.q as string).trim() };
+}
+
 export function toReportResponse(report: Report): ReportResponseDto {
   return {
     id: report.id,
+    userId: report.userId,
     title: report.title,
     severity: report.severity,
     status: report.status,
     description: report.description,
-    reporter: report.reporter,
   };
 }
 
-export function compareReports(
-  a: Report,
-  b: Report,
-  sortBy: ReportListQuery["sortBy"],
-  sortDir: "asc" | "desc",
-): number {
-  let first: string | number = a[sortBy];
-  let second: string | number = b[sortBy];
-
-  if (sortBy === "severity") {
-    first = severityRank[a.severity];
-    second = severityRank[b.severity];
-  }
-
-  let result: number;
-  if (typeof first === "number" && typeof second === "number") {
-    result = first - second;
-  } else {
-    result = String(first).localeCompare(String(second), "uk");
-  }
-
-  return sortDir === "asc" ? result : -result;
+export function toReportWithAuthorResponse(
+  report: ReportWithAuthor,
+): ReportWithAuthorResponseDto {
+  return {
+    ...toReportResponse(report),
+    authorName: report.authorName,
+    authorEmail: report.authorEmail,
+  };
 }

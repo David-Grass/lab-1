@@ -12,24 +12,50 @@ export type User = {
 
 export type Report = {
   id: number;
+  userId: number;
   title: string;
   severity: Severity;
   status: Status;
   description: string;
-  reporter: string;
+};
+
+export type ReportWithAuthor = Report & {
+  authorName: string;
+  authorEmail: string;
+};
+
+export type ReportComment = {
+  id: number;
+  reportId: number;
+  userId: number;
+  body: string;
+};
+
+export type ReportCommentWithDetails = ReportComment & {
+  authorName: string;
+  reportTitle: string;
 };
 
 export type ListResponse<T> = {
-  items: T[];
-  total: number;
-  page?: number;
-  pageSize?: number;
+  data: T[];
+  meta: {
+    total: number;
+    page?: number;
+    pageSize?: number;
+  };
 };
 
 export type ErrorResponse = {
   error: {
     code: string;
     message: string;
-    details: Array<{ field: string; message: string }> | null;
+    details: string | null;
   };
+};
+
+export type ReportStats = {
+  total: number;
+  bySeverity: Record<Severity, number>;
+  byStatus: Record<Status, number>;
+  avgCommentsPerReport: number;
 };

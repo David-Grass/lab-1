@@ -67,7 +67,16 @@ export function collectErrors(
   return checks.filter((item): item is ValidationDetail => item !== null);
 }
 
+export function formatValidationDetails(errors: ValidationDetail[]): string {
+  return errors.map((item) => `${item.field}: ${item.message}`).join("; ");
+}
+
 export function assertValid(errors: ValidationDetail[]): void {
   if (errors.length === 0) return;
-  throw new ApiError(400, "VALIDATION_ERROR", "Invalid request body", errors);
+  throw new ApiError(
+    400,
+    "VALIDATION_ERROR",
+    "Invalid request body",
+    formatValidationDetails(errors),
+  );
 }

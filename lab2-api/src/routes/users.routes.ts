@@ -1,15 +1,23 @@
 import { Router } from "express";
 import {
+  parseUserListQuery,
   validateCreateUserDto,
   validatePatchUserDto,
   validateUpdateUserDto,
 } from "../dtos/users.dto.js";
 import { usersController } from "../controllers/users.controller.js";
-import { validateBody } from "../middleware/validate.middleware.js";
+import {
+  validateBody,
+  validateQuery,
+} from "../middleware/validate.middleware.js";
 
 export const usersRouter = Router();
 
-usersRouter.get("/", usersController.list.bind(usersController));
+usersRouter.get(
+  "/",
+  validateQuery(parseUserListQuery),
+  usersController.list.bind(usersController),
+);
 usersRouter.get("/:id", usersController.getById.bind(usersController));
 usersRouter.post(
   "/",

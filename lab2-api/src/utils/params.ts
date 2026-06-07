@@ -14,7 +14,12 @@ export function parseRouteId(req: Request, name: string): number {
   const id = Number.parseInt(raw, 10);
 
   if (Number.isNaN(id) || id < 1) {
-    throw new ApiError(404, "NOT_FOUND", "Resource not found");
+    throw new ApiError(
+      404,
+      "NOT_FOUND",
+      "Resource not found",
+      `invalid id: ${raw}`,
+    );
   }
 
   return id;

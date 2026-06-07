@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS ReportComments (
+  id INTEGER PRIMARY KEY,
+  reportId INTEGER NOT NULL,
+  userId INTEGER NOT NULL,
+  body TEXT NOT NULL CHECK (length(trim(body)) >= 1 AND length(body) <= 1000),
+  FOREIGN KEY (reportId) REFERENCES Reports(id) ON DELETE CASCADE,
+  FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE RESTRICT
+);
